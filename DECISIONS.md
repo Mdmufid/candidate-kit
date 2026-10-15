@@ -1,0 +1,7 @@
+# DECISIONS.md  
+
+1. **Indexes.** I create a unique `employees.emp_code` index, a unique attendance natural-key index on `(emp_code, date)`, and indexes supporting date/employee listing and employee-period lookups. I considered a status-first index, but the common filters are employee and date, so it would add write cost without helping the main paths.
+2. **Punch-in race.** Both requests can read that no record exists, but the unique `(emp_code, date)` index serializes the inserts. One insert succeeds with 201; the other raises `DuplicateKeyError` and becomes 409. No check-then-insert decision is trusted for correctness.
+3. **Ties.** Ranking counts how many totals are strictly greater, so equal totals receive the same standard-competition rank. Filtering happens after rank calculation, so every employee tied at the cutoff rank is returned.
+4. **Headcount.** The summary starts from employees whose `joined_on` is within the month, groups their logs only afterward, and emits every resulting department group. An employee with no logs therefore still contributes to headcount.
+5. **One change for 100x data.** Since I am already using MongoDB aggregation pipelines, running them on-the-fly against 10 million records would eventually become too slow. I would implement a daily cron job to pre-aggregate historical data into materialized views or summary collections, so the endpoints only query pre-calculated stats.
